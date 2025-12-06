@@ -21,6 +21,15 @@ body.love, body[class="love"] {
   --bubble-other: #fff0f6;
 }
 
+/* button off camera, off mic*/
+#toggleCamBtn, #toggleMicBtn {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #d0d7e2;
+  background: #fff;
+  cursor: pointer;
+}
+
 /* WORK theme */
 body.work, body[class="work"] {
   --bg:#f1f5fb;
