@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WebRTC Demo - 1:1 & Group (mesh)</title>
+  <style>
+    body { font-family: Arial; margin: 12px }
+    #videos { display:flex; flex-wrap:wrap; gap:8px }
+    video { width: 320px; height: 240px; background: #000 }
+    #controls { margin-bottom: 12px }
+  </style>
+</head>
+<body>
+  <h2>WebRTC Demo — 1:1, 1:n (mesh) group call</h2>
+  <div id="controls">
+    Room: <input id="roomId" value="room1" />
+    Name: <input id="name" value="guest" />
+    <button id="joinBtn">Join</button>
+    <button id="leaveBtn" disabled>Leave</button>
+    <button id="screenshareBtn" disabled>Screen Share</button>
+    <button id="muteBtn" disabled>Toggle Mute</button>
+  </div>
+
+  <div id="videos">
+    <div>
+      <p>Local</p>
+      <video id="localVideo" autoplay muted playsinline></video>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
