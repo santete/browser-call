@@ -2,31 +2,60 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WebRTC Demo - 1:1 & Group (mesh)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WebRTC + Chat — Work / Love Theme</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
   <style>
-    body { font-family: Arial; margin: 12px }
-    #videos { display:flex; flex-wrap:wrap; gap:8px }
-    video { width: 320px; height: 240px; background: #000 }
-    #controls { margin-bottom: 12px }
+    /* small fallback if CSS not loaded quickly */
+    body { font-family: Inter, system-ui, Arial; }
   </style>
 </head>
-<body>
-  <h2>WebRTC Demo — 1:1, 1:n (mesh) group call</h2>
-  <div id="controls">
-    Room: <input id="roomId" value="room1" />
-    Name: <input id="name" value="guest" />
-    <button id="joinBtn">Join</button>
-    <button id="leaveBtn" disabled>Leave</button>
-    <button id="screenshareBtn" disabled>Screen Share</button>
-    <button id="muteBtn" disabled>Toggle Mute</button>
+<body class="work"> <!-- default theme: work -->
+  <div class="topbar">
+    <h2>WebRTC + Chat</h2>
+    <div class="controls">
+      <label>Room: <input id="roomId" type="text" value="room1"></label>
+      <label>Name: <input id="name" type="text" value="Guest"></label>
+      <button id="joinBtn">Join</button>
+      <button id="leaveBtn" disabled>Leave</button>
+      <select id="themeSelect" aria-label="theme">
+        <option value="work">Work</option>
+        <option value="love">Love</option>
+      </select>
+    </div>
   </div>
 
-  <div id="videos">
-    <div>
-      <p>Local</p>
-      <video id="localVideo" autoplay muted playsinline></video>
-    </div>
+  <div class="layout">
+    <main class="left">
+      <section class="video-card">
+        <h3>Local</h3>
+        <video id="localVideo" autoplay muted playsinline></video>
+      </section>
+
+      <section class="video-card">
+        <h3>Remotes</h3>
+        <div id="videos" class="remote-list"></div>
+      </section>
+    </main>
+
+    <aside class="chat-panel">
+      <div class="chat-header">
+        <div class="title">💬 Chat (iMessage style)</div>
+        <div class="muted">Theme: <span id="themeLabel">Work</span></div>
+      </div>
+
+      <div id="chatMessages" class="chat-messages"></div>
+
+      <div id="stickerPalette" class="sticker-palette"></div>
+
+      <div class="chat-input">
+        <input id="chatInput" type="text" placeholder="Nhập tin nhắn..." />
+        <button id="sendChatBtn">Gửi</button>
+      </div>
+
+      <div id="typingIndicator" class="typing" style="display:none;"></div>
+    </aside>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>

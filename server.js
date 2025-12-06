@@ -1,4 +1,4 @@
-// Simple signaling server using Express + Socket.IO
+// server.js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -9,59 +9,72 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
-// rooms data not strictly required but helpful for listing
-const rooms = {}; // { roomId: Set(socketId) }
+// rooms map: roomId -> Set(socketId)
+const rooms = new Map();
 
-io.on('connection', socket => {
-  console.log('socket connected', socket.id);
+io.on('connection', (socket) => {
+  console.log('connected', socket.id);
 
-  socket.on('join', ({ roomId, userName }) => {
-    socket.join(roomId);
+  socket.on('join', ({ roomId, userName, avatar }) => {
     socket.data.roomId = roomId;
     socket.data.userName = userName || socket.id;
+    socket.data.avatar = avatar || null;
 
-    if (!rooms[roomId]) rooms[roomId] = new Set();
-    // Notify existing peers about new peer
-    socket.to(roomId).emit('user-joined', { id: socket.id, userName: socket.data.userName });
+    if (!rooms.has(roomId)) rooms.set(roomId, new Set());
+    const set = rooms.get(roomId);
 
-    // Send list of existing participants to the joining peer
-    const others = Array.from(rooms[roomId]);
-    socket.emit('joined', { you: socket.id, peers: others });
+    // inform existing peers about new user
+    socket.to(roomId).emit('user-joined', { id: socket.id, userName: socket.data.userName, avatar: socket.data.avatar });
 
-    rooms[roomId].add(socket.id);
-    console.log(`join ${socket.id} -> ${roomId}`);
+    // send joined event to the joining peer: your id + peers list
+    socket.emit('joined', { you: socket.id, peers: Array.from(set) });
+
+    set.add(socket.id);
+    socket.join(roomId);
+    console.log(`${socket.id} joined ${roomId}`);
   });
 
-  socket.on('offer', ({ to, sdp }) => {
-    io.to(to).emit('offer', { from: socket.id, sdp });
+  // Signaling (directed)
+  socket.on('offer', ({ to, sdp }) => io.to(to).emit('offer', { from: socket.id, sdp }));
+  socket.on('answer', ({ to, sdp }) => io.to(to).emit('answer', { from: socket.id, sdp }));
+  socket.on('ice-candidate', ({ to, candidate }) => io.to(to).emit('ice-candidate', { from: socket.id, candidate }));
+
+  // Chat: relay to others in the same room (exclude sender) -> prevents duplicate
+  socket.on('chat-message', ({ roomId, userName, avatar, message, type }) => {
+    socket.to(roomId).emit('chat-message', {
+      id: socket.id,
+      userName,
+      avatar,
+      message,
+      type: type || 'text',
+      timestamp: Date.now()
+    });
   });
 
-  socket.on('answer', ({ to, sdp }) => {
-    io.to(to).emit('answer', { from: socket.id, sdp });
+  // Typing indicator -> relay to others
+  socket.on('typing', ({ roomId, userName, isTyping }) => {
+    socket.to(roomId).emit('typing', { id: socket.id, userName, isTyping });
   });
 
-  socket.on('ice-candidate', ({ to, candidate }) => {
-    io.to(to).emit('ice-candidate', { from: socket.id, candidate });
-  });
-
+  // Leave
   socket.on('leave', () => {
-    const roomId = socket.data.roomId;
-    if (roomId) {
-      socket.to(roomId).emit('user-left', { id: socket.id });
-      rooms[roomId].delete(socket.id);
-      socket.leave(roomId);
+    const rid = socket.data.roomId;
+    if (rid && rooms.has(rid)) {
+      socket.to(rid).emit('user-left', { id: socket.id });
+      rooms.get(rid).delete(socket.id);
+      socket.leave(rid);
     }
   });
 
   socket.on('disconnect', () => {
-    const roomId = socket.data.roomId;
-    if (roomId && rooms[roomId]) {
-      socket.to(roomId).emit('user-left', { id: socket.id });
-      rooms[roomId].delete(socket.id);
+    const rid = socket.data.roomId;
+    if (rid && rooms.has(rid)) {
+      socket.to(rid).emit('user-left', { id: socket.id });
+      rooms.get(rid).delete(socket.id);
     }
-    console.log('socket disconnected', socket.id);
+    console.log('disconnected', socket.id);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log('Server running on', PORT));
+server.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
