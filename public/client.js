@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const leaveBtn = document.getElementById('leaveBtn');
   const roomInput = document.getElementById('roomId');
   const nameInput = document.getElementById('name');
+  const toggleCamBtn = document.getElementById('toggleCamBtn');
+  const toggleMicBtn = document.getElementById('toggleMicBtn');
   const themeSelect = document.getElementById('themeSelect');
 
   const localVideo = document.getElementById('localVideo');
@@ -23,6 +25,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let socket = null;
   let myId = null;
   let roomId = null;
+  let camOn = true;
+  let micOn = true;
   let userName = null;
   let myAvatar = null;
   let localStream = null;
@@ -265,6 +269,33 @@ document.addEventListener('DOMContentLoaded', () => {
       joinBtn.disabled = false; leaveBtn.disabled = true;
     });
   }
+
+  toggleCamBtn.addEventListener('click', () => {
+    //alert("hello");
+    if (!localStream) return;
+
+    camOn = !camOn;
+
+    localStream.getVideoTracks().forEach(t => t.enabled = camOn);
+
+    if (camOn) {
+      toggleCamBtn.textContent = "Camera Off";
+      localVideo.style.filter = "none";
+    } else {
+      toggleCamBtn.textContent = "Camera On";
+      localVideo.style.filter = "brightness(0)";  // đen màn
+    }
+  });
+
+  toggleMicBtn.addEventListener('click', () => {
+    if (!localStream) return;
+
+    micOn = !micOn;
+
+    localStream.getAudioTracks().forEach(t => t.enabled = micOn);
+
+    toggleMicBtn.textContent = micOn ? "Mic Off" : "Mic On";
+  });
 
   function renderStickers() {
     if (!stickerPalette) return;
