@@ -1,200 +1,282 @@
-// Client-side signaling + PeerConnection management (mesh)
-const socket = io();
-let localStream = null;
-const pcs = {}; // peerId -> RTCPeerConnection
-const remoteContainers = {}; // peerId -> DOM container
-let roomId = null;
-let myId = null;
-let audioMuted = false;
+// public/client.js
+// Clean client: join/leave, WebRTC mesh (small groups), chat (no duplicate), stickers, typing, theme switch
 
-const videosEl = document.getElementById('videos');
-const localVideo = document.getElementById('localVideo');
-const joinBtn = document.getElementById('joinBtn');
-const leaveBtn = document.getElementById('leaveBtn');
-const screenshareBtn = document.getElementById('screenshareBtn');
-const muteBtn = document.getElementById('muteBtn');
+document.addEventListener('DOMContentLoaded', () => {
+  // DOM
+  const joinBtn = document.getElementById('joinBtn');
+  const leaveBtn = document.getElementById('leaveBtn');
+  const roomInput = document.getElementById('roomId');
+  const nameInput = document.getElementById('name');
+  const themeSelect = document.getElementById('themeSelect');
 
-joinBtn.onclick = async () => {
-  roomId = document.getElementById('roomId').value.trim();
-  const name = document.getElementById('name').value.trim();
-  if (!roomId) return alert('enter room id');
+  const localVideo = document.getElementById('localVideo');
+  const videos = document.getElementById('videos');
 
-  await startLocal();
-  socket.emit('join', { roomId, userName: name });
-  joinBtn.disabled = true;
-  leaveBtn.disabled = false;
-  screenshareBtn.disabled = false;
-  muteBtn.disabled = false;
-};
+  const chatMessages = document.getElementById('chatMessages');
+  const chatInput = document.getElementById('chatInput');
+  const sendChatBtn = document.getElementById('sendChatBtn');
+  const stickerPalette = document.getElementById('stickerPalette');
+  const typingIndicator = document.getElementById('typingIndicator');
+  const themeLabel = document.getElementById('themeLabel');
 
-leaveBtn.onclick = () => {
-  socket.emit('leave');
-  cleanupAll();
-  joinBtn.disabled = false;
-  leaveBtn.disabled = true;
-};
+  // state
+  let socket = null;
+  let myId = null;
+  let roomId = null;
+  let userName = null;
+  let myAvatar = null;
+  let localStream = null;
+  const pcs = {};            // peerId -> RTCPeerConnection
+  const remoteEls = {};      // peerId -> { wrapper, video }
 
-screenshareBtn.onclick = async () => {
-  try {
-    const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-    // Replace local video track for all peer connections (simple approach)
-    const screenTrack = screenStream.getVideoTracks()[0];
-    for (const id in pcs) {
-      const sender = pcs[id].getSenders().find(s => s.track && s.track.kind === 'video');
-      if (sender) sender.replaceTrack(screenTrack);
+  // stickers
+  const STICKERS = [
+    '/assets/stickers/heart.png',
+    '/assets/stickers/smile.png',
+    '/assets/stickers/fire.png'
+  ];
+
+  // helpers
+  const defaultAvatar = (name) => `https://ui-avatars.com/api/?name=${encodeURIComponent(name||'Guest')}&background=0D8ABC&color=fff&rounded=true`;
+  const timeFmt = (ts) => new Date(ts||Date.now()).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+
+  function scrollChat() {
+    const last = chatMessages.lastElementChild;
+    if (last) last.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }
+
+  function renderChatMessage({ id, userName: from, avatar, message, type, timestamp }) {
+    const isMe = id === myId;
+    const row = document.createElement('div');
+    row.className = 'msg-row' + (isMe ? ' end' : '');
+
+    if (!isMe) {
+      const av = document.createElement('img'); av.className = 'msg-avatar'; av.src = avatar || defaultAvatar(from); row.appendChild(av);
     }
 
-    // When screen sharing stops, restore camera
-    screenTrack.onended = async () => {
-      const camTrack = localStream.getVideoTracks()[0];
-      for (const id in pcs) {
-        const sender = pcs[id].getSenders().find(s => s.track && s.track.kind === 'video');
-        if (sender) sender.replaceTrack(camTrack);
+    const box = document.createElement('div'); box.style.maxWidth = '78%';
+    const bubble = document.createElement('div'); bubble.className = isMe ? 'bubble me' : 'bubble other';
+
+    if (type === 'sticker') {
+      const img = document.createElement('img'); img.src = message; img.className = 'sticker'; bubble.appendChild(img);
+    } else {
+      bubble.textContent = message;
+    }
+
+    const timeEl = document.createElement('div'); timeEl.className = 'msg-time'; timeEl.textContent = timeFmt(timestamp);
+
+    box.appendChild(bubble); box.appendChild(timeEl);
+    row.appendChild(box);
+
+    if (isMe) {
+      const av2 = document.createElement('img'); av2.className = 'msg-avatar'; av2.src = myAvatar; row.appendChild(av2);
+    }
+
+    chatMessages.appendChild(row);
+    scrollChat();
+  }
+
+  const typingMap = new Map();
+  function showTyping(id, name) {
+    if (typingMap.has(id)) return;
+    const el = document.createElement('div'); el.id = `typing-${id}`; el.className = 'typing'; el.textContent = `${name} đang nhập...`;
+    chatMessages.appendChild(el); typingMap.set(id, el); scrollChat();
+  }
+  function hideTyping(id) { const el = typingMap.get(id); if (el) { el.remove(); typingMap.delete(id); } }
+
+  function renderStickers() {
+    if (!stickerPalette) return;
+    stickerPalette.innerHTML = '';
+    STICKERS.forEach(u => {
+      const img = document.createElement('img'); img.src = u; img.className = 'sticker'; img.title = 'Send sticker';
+      img.addEventListener('click', () => {
+        // local render then send to server (server relays to others)
+        renderChatMessage({ id: myId, userName, avatar: myAvatar, message: u, type: 'sticker', timestamp: Date.now() });
+        socket.emit('chat-message', { roomId, userName, avatar: myAvatar, message: u, type: 'sticker' });
+      });
+      stickerPalette.appendChild(img);
+    });
+  }
+
+  // Socket + signaling handlers
+  function initSocket() {
+    socket = io();
+
+    socket.on('connect', () => console.log('socket connected', socket.id));
+
+    socket.on('joined', async ({ you, peers }) => {
+      myId = you;
+      // create offers to existing peers (mesh)
+      for (const peerId of peers) {
+        await createPeerConnection(peerId, true);
+      }
+    });
+
+    socket.on('user-joined', ({ id }) => {
+      console.log('user joined', id);
+      // no immediate action here: joining peer will create offers to existing peers
+    });
+
+    socket.on('offer', async ({ from, sdp }) => {
+      if (!pcs[from]) await createPeerConnection(from, false);
+      const pc = pcs[from];
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit('answer', { to: from, sdp: answer });
+    });
+
+    socket.on('answer', async ({ from, sdp }) => {
+      const pc = pcs[from]; if (!pc) return;
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    });
+
+    socket.on('ice-candidate', async ({ from, candidate }) => {
+      const pc = pcs[from]; if (!pc) return;
+      try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) { console.warn(e); }
+    });
+
+    socket.on('user-left', ({ id }) => {
+      if (pcs[id]) { try { pcs[id].close(); } catch (e) {} delete pcs[id]; }
+      if (remoteEls[id]) { remoteEls[id].wrapper.remove(); delete remoteEls[id]; }
+    });
+
+    // chat: server forwards to others only
+    socket.on('chat-message', (data) => {
+      renderChatMessage({ id: data.id, userName: data.userName, avatar: data.avatar, message: data.message, type: data.type, timestamp: data.timestamp });
+    });
+
+    socket.on('typing', ({ id, userName: tname, isTyping }) => {
+      if (isTyping) showTyping(id, tname); else hideTyping(id);
+    });
+
+    socket.emit('join', { roomId, userName, avatar: myAvatar });
+  }
+
+  // WebRTC helpers
+  function createRemoteElement(peerId) {
+    const wrapper = document.createElement('div'); wrapper.className = 'video-card'; wrapper.id = 'peer-'+peerId;
+    const label = document.createElement('p'); label.style.margin='0 0 8px 0'; label.textContent = 'Peer: ' + peerId;
+    const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; v.style.width='320px'; v.style.height='180px'; v.style.borderRadius='8px';
+    wrapper.appendChild(label); wrapper.appendChild(v);
+    videos.appendChild(wrapper);
+    remoteEls[peerId] = { wrapper, video: v };
+    return v;
+  }
+
+  async function createPeerConnection(peerId, isInitiator) {
+    if (pcs[peerId]) return pcs[peerId];
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    pcs[peerId] = pc;
+
+    if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+    pc.ontrack = (e) => {
+      const v = (remoteEls[peerId]?.video) || createRemoteElement(peerId);
+      v.srcObject = e.streams[0];
+    };
+
+    pc.onicecandidate = (e) => { if (e.candidate) socket.emit('ice-candidate', { to: peerId, candidate: e.candidate }); };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+        if (remoteEls[peerId]) { remoteEls[peerId].wrapper.remove(); delete remoteEls[peerId]; }
+        try { pc.close(); } catch (e) {}
+        delete pcs[peerId];
       }
     };
-  } catch (e) {
-    console.warn('screen share canceled', e);
+
+    if (isInitiator) {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit('offer', { to: peerId, sdp: offer });
+    }
+
+    return pc;
   }
-};
 
-muteBtn.onclick = () => {
-  audioMuted = !audioMuted;
-  localStream.getAudioTracks().forEach(t => t.enabled = !audioMuted);
-  muteBtn.textContent = audioMuted ? 'Unmute' : 'Mute';
-};
-
-async function startLocal() {
-  if (!localStream) {
+  async function startLocalMedia() {
+    if (localStream) return localStream;
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     localVideo.srcObject = localStream;
+    return localStream;
   }
-}
 
-function createRemoteContainer(peerId) {
-  const wrapper = document.createElement('div');
-  wrapper.id = 'remote-' + peerId;
-  const p = document.createElement('p');
-  p.innerText = 'Remote: ' + peerId;
-  const v = document.createElement('video');
-  v.autoplay = true;
-  v.playsInline = true;
-  wrapper.appendChild(p);
-  wrapper.appendChild(v);
-  videosEl.appendChild(wrapper);
-  remoteContainers[peerId] = { wrapper, video: v };
-  return v;
-}
-
-function removeRemoteContainer(peerId) {
-  const c = remoteContainers[peerId];
-  if (c) {
-    c.wrapper.remove();
-    delete remoteContainers[peerId];
+  // Chat send (render locally then send to server to relay to others)
+  function sendChatText() {
+    const txt = chatInput.value.trim();
+    if (!txt || !socket) return;
+    renderChatMessage({ id: myId, userName, avatar: myAvatar, message: txt, type: 'text', timestamp: Date.now() });
+    socket.emit('chat-message', { roomId, userName, avatar: myAvatar, message: txt, type: 'text' });
+    chatInput.value = '';
+    sendTyping(false);
   }
-}
 
-function createPeerConnection(peerId, isInitiator) {
-  const pc = new RTCPeerConnection({
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' }
-    ]
+  // typing
+  let typingTimer = null;
+  let amTyping = false;
+  function sendTyping(flag) {
+    if (!socket) return;
+    if (flag) {
+      if (!amTyping) { amTyping = true; socket.emit('typing', { roomId, userName, isTyping: true }); }
+      clearTimeout(typingTimer);
+      typingTimer = setTimeout(() => { amTyping = false; socket.emit('typing', { roomId, userName, isTyping: false }); }, 1000);
+    } else {
+      amTyping = false; socket.emit('typing', { roomId, userName, isTyping: false }); clearTimeout(typingTimer);
+    }
+  }
+
+  // UI wiring
+  if (themeSelect) {
+    themeSelect.addEventListener('change', () => {
+      const v = themeSelect.value;
+      document.body.className = v;
+      if (themeLabel) themeLabel.textContent = v === 'love' ? 'Love' : 'Work';
+    });
+  }
+
+  if (sendChatBtn) sendChatBtn.addEventListener('click', sendChatText);
+  if (chatInput) chatInput.addEventListener('keydown', (e) => {
+    sendTyping(true);
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatText(); }
   });
 
-  // Add local tracks
-  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+  if (joinBtn) {
+    joinBtn.addEventListener('click', async () => {
+      roomId = roomInput.value || 'room1';
+      userName = nameInput.value || 'Guest';
+      myAvatar = defaultAvatar(userName);
+      await startLocalMedia();
+      renderStickers();
+      initSocket();
+      joinBtn.disabled = true; leaveBtn.disabled = false;
+    });
+  }
 
-  // When remote track arrives
-  pc.ontrack = (evt) => {
-    const remoteVideo = remoteContainers[peerId]?.video || createRemoteContainer(peerId);
-    // Some browsers deliver multiple tracks in separate ontrack calls — use streams[0]
-    remoteVideo.srcObject = evt.streams[0];
-  };
+  if (leaveBtn) {
+    leaveBtn.addEventListener('click', () => {
+      if (socket) socket.emit('leave');
+      Object.values(pcs).forEach(pc => { try { pc.close(); } catch (e) {} });
+      Object.keys(pcs).forEach(k => delete pcs[k]);
+      Object.values(remoteEls).forEach(r => r.wrapper.remove());
+      Object.keys(remoteEls).forEach(k => delete remoteEls[k]);
+      if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; if (localVideo) localVideo.srcObject = null; }
+      chatMessages.innerHTML = '';
+      joinBtn.disabled = false; leaveBtn.disabled = true;
+    });
+  }
 
-  pc.onicecandidate = (evt) => {
-    if (evt.candidate) {
-      socket.emit('ice-candidate', { to: peerId, candidate: evt.candidate });
-    }
-  };
-
-  pc.onconnectionstatechange = () => {
-    if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-      removeRemoteContainer(peerId);
-      pc.close();
-      delete pcs[peerId];
-    }
-  };
-
-  pcs[peerId] = pc;
-  return pc;
-}
-
-// Signaling handlers
-socket.on('joined', async ({ you, peers }) => {
-  myId = you;
-  console.log('joined as', myId, 'peers:', peers);
-  // Create an offer to each existing peer (mesh)
-  for (const peerId of peers) {
-    // create pc + offer
-    const pc = createPeerConnection(peerId, true);
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    socket.emit('offer', { to: peerId, sdp: offer });
+  function renderStickers() {
+    if (!stickerPalette) return;
+    stickerPalette.innerHTML = '';
+    STICKERS.forEach(u => {
+      const img = document.createElement('img'); img.src = u; img.className = 'sticker'; img.title = 'Send sticker';
+      img.addEventListener('click', () => {
+        // local render + emit
+        renderChatMessage({ id: myId, userName, avatar: myAvatar, message: u, type: 'sticker', timestamp: Date.now() });
+        socket.emit('chat-message', { roomId, userName, avatar: myAvatar, message: u, type: 'sticker' });
+      });
+      stickerPalette.appendChild(img);
+    });
   }
 });
-
-socket.on('user-joined', async ({ id, userName }) => {
-  console.log('user joined', id);
-  // New peer joined — if we already exist in room, create a pc and be initiator
-  // The joining peer will receive 'joined' event with existing peers earlier; here we act as responder
-});
-
-socket.on('offer', async ({ from, sdp }) => {
-  console.log('offer from', from);
-  // Create pc if doesn't exist
-  if (!pcs[from]) createPeerConnection(from, false);
-  const pc = pcs[from];
-  await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  socket.emit('answer', { to: from, sdp: answer });
-});
-
-socket.on('answer', async ({ from, sdp }) => {
-  console.log('answer from', from);
-  const pc = pcs[from];
-  if (!pc) return console.warn('no pc for', from);
-  await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-});
-
-socket.on('ice-candidate', async ({ from, candidate }) => {
-  const pc = pcs[from];
-  if (!pc) return;
-  try {
-    await pc.addIceCandidate(new RTCIceCandidate(candidate));
-  } catch (e) {
-    console.warn('failed addIceCandidate', e);
-  }
-});
-
-socket.on('user-left', ({ id }) => {
-  console.log('user-left', id);
-  if (pcs[id]) {
-    try { pcs[id].close(); } catch(e){}
-    delete pcs[id];
-  }
-  removeRemoteContainer(id);
-});
-
-function cleanupAll() {
-  for (const id in pcs) try { pcs[id].close(); } catch(e) {}
-  Object.keys(pcs).forEach(k => delete pcs[k]);
-  Object.keys(remoteContainers).forEach(k => removeRemoteContainer(k));
-  if (localStream) {
-    localStream.getTracks().forEach(t => t.stop());
-    localStream = null;
-    localVideo.srcObject = null;
-  }
-}
-
-// handle page unload
-window.addEventListener('beforeunload', () => socket.emit('leave'));
