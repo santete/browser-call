@@ -74,9 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // stickers
   const STICKERS = [
-    '/assets/stickers/heart.png',
-    '/assets/stickers/smile.png',
-    '/assets/stickers/fire.png'
+    'https://ibb.co/7t2BfdYv',
+    'https://ibb.co/nMbsWbwX',
+    'https://ibb.co/1Gh3MrHX'
   ];
 
   // helpers
