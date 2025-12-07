@@ -274,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
     themeSelect.addEventListener('change', () => {
       const v = themeSelect.value;
       document.body.className = v;
-      if (themeLabel) themeLabel.textContent = v === 'love' ? 'Love' : 'Work';
+      if (themeLabel) themeLabel.textContent = v === 'romantic' ? 'Romantic' : 'Basic';
     });
   }
 
