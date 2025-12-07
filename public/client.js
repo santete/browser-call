@@ -1,54 +1,14 @@
 // public/client.js
-// Clean client: join/leave, WebRTC mesh (small groups), chat (no duplicate), stickers, typing, theme switch
-import { signInWithGoogle, signOut, getCurrentUser } from './supabase.js';
-const loginBtn = document.getElementById('loginBtn');
-const logoutBtn = document.getElementById('logoutBtn');
-const userInfo = document.getElementById('userInfo');
+// Full clean client - WebRTC mesh (small group) + chat + stickers + typing + theme + cam/mic toggles
 
-
-async function refreshAuthUI() {
-const user = await getCurrentUser();
-if (user) {
-loginBtn.classList.add('hidden');
-logoutBtn.classList.remove('hidden');
-userInfo.classList.remove('hidden');
-
-
-userInfo.innerHTML = `
-<img src="${user.user_metadata.avatar_url}" class="avatar" />
-<span>${user.user_metadata.full_name}</span>
-`;
-} else {
-loginBtn.classList.remove('hidden');
-logoutBtn.classList.add('hidden');
-userInfo.classList.add('hidden');
-}
-}
-
-
-loginBtn.onclick = async () => {
-await signInWithGoogle();
-};
-
-
-logoutBtn.onclick = async () => {
-await signOut();
-refreshAuthUI();
-};
-
-
-// Refresh UI khi vào trang hoặc redirect from Google
-refreshAuthUI();
-
-document.addEventListener('DOMContentLoaded', () => {
+(() => {
   // DOM
   const joinBtn = document.getElementById('joinBtn');
   const leaveBtn = document.getElementById('leaveBtn');
   const roomInput = document.getElementById('roomId');
   const nameInput = document.getElementById('name');
-  const toggleCamBtn = document.getElementById('toggleCamBtn');
-  const toggleMicBtn = document.getElementById('toggleMicBtn');
   const themeSelect = document.getElementById('themeSelect');
+  const themeLabel = document.getElementById('themeLabel');
 
   const localVideo = document.getElementById('localVideo');
   const videos = document.getElementById('videos');
@@ -58,28 +18,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const sendChatBtn = document.getElementById('sendChatBtn');
   const stickerPalette = document.getElementById('stickerPalette');
   const typingIndicator = document.getElementById('typingIndicator');
-  const themeLabel = document.getElementById('themeLabel');
 
-  // state
+  const toggleCamBtn = document.getElementById('toggleCamBtn');
+  const toggleMicBtn = document.getElementById('toggleMicBtn');
+  const screenShareBtn = document.getElementById('screenShareBtn');
+
+  // State
   let socket = null;
   let myId = null;
   let roomId = null;
-  let camOn = true;
-  let micOn = true;
   let userName = null;
   let myAvatar = null;
   let localStream = null;
-  const pcs = {};            // peerId -> RTCPeerConnection
-  const remoteEls = {};      // peerId -> { wrapper, video }
+  const pcs = {};       // peerId -> RTCPeerConnection
+  const remoteEls = {}; // peerId -> { wrapper, video }
 
-  // stickers
+  // stickers (provide assets in public/assets/stickers/)
   const STICKERS = [
-    'https://ibb.co/7t2BfdYv',
-    'https://ibb.co/nMbsWbwX',
-    'https://ibb.co/1Gh3MrHX'
+    '/assets/stickers/heart.png',
+    '/assets/stickers/smile.png',
+    '/assets/stickers/fire.png'
   ];
 
-  // helpers
+  // utilities
   const defaultAvatar = (name) => `https://ui-avatars.com/api/?name=${encodeURIComponent(name||'Guest')}&background=0D8ABC&color=fff&rounded=true`;
   const timeFmt = (ts) => new Date(ts||Date.now()).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
 
@@ -88,13 +49,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (last) last.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }
 
+  // chat render
   function renderChatMessage({ id, userName: from, avatar, message, type, timestamp }) {
     const isMe = id === myId;
     const row = document.createElement('div');
     row.className = 'msg-row' + (isMe ? ' end' : '');
 
     if (!isMe) {
-      const av = document.createElement('img'); av.className = 'msg-avatar'; av.src = avatar || defaultAvatar(from); row.appendChild(av);
+      const av = document.createElement('img'); av.className = 'msg-avatar'; av.src = avatar || defaultAvatar(from);
+      row.appendChild(av);
     }
 
     const box = document.createElement('div'); box.style.maxWidth = '78%';
@@ -107,7 +70,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const timeEl = document.createElement('div'); timeEl.className = 'msg-time'; timeEl.textContent = timeFmt(timestamp);
-
     box.appendChild(bubble); box.appendChild(timeEl);
     row.appendChild(box);
 
@@ -119,29 +81,34 @@ document.addEventListener('DOMContentLoaded', () => {
     scrollChat();
   }
 
+  // typing indicator
   const typingMap = new Map();
   function showTyping(id, name) {
     if (typingMap.has(id)) return;
     const el = document.createElement('div'); el.id = `typing-${id}`; el.className = 'typing'; el.textContent = `${name} đang nhập...`;
     chatMessages.appendChild(el); typingMap.set(id, el); scrollChat();
   }
-  function hideTyping(id) { const el = typingMap.get(id); if (el) { el.remove(); typingMap.delete(id); } }
+  function hideTyping(id) {
+    const el = typingMap.get(id);
+    if (el) { el.remove(); typingMap.delete(id); }
+  }
 
+  // sticker UI
   function renderStickers() {
     if (!stickerPalette) return;
     stickerPalette.innerHTML = '';
     STICKERS.forEach(u => {
       const img = document.createElement('img'); img.src = u; img.className = 'sticker'; img.title = 'Send sticker';
       img.addEventListener('click', () => {
-        // local render then send to server (server relays to others)
+        // render locally then send to others (server relays to others only)
         renderChatMessage({ id: myId, userName, avatar: myAvatar, message: u, type: 'sticker', timestamp: Date.now() });
-        socket.emit('chat-message', { roomId, userName, avatar: myAvatar, message: u, type: 'sticker' });
+        socket && socket.emit('chat-message', { roomId, userName, avatar: myAvatar, message: u, type: 'sticker' });
       });
       stickerPalette.appendChild(img);
     });
   }
 
-  // Socket + signaling handlers
+  // SOCKET + signaling handlers
   function initSocket() {
     socket = io();
 
@@ -156,8 +123,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('user-joined', ({ id }) => {
-      console.log('user joined', id);
-      // no immediate action here: joining peer will create offers to existing peers
+      console.log('user-joined', id);
+      // no action: joining peer will create offers to existing peers
     });
 
     socket.on('offer', async ({ from, sdp }) => {
@@ -184,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (remoteEls[id]) { remoteEls[id].wrapper.remove(); delete remoteEls[id]; }
     });
 
-    // chat: server forwards to others only
+    // chat: server forwards to others only (we render local immediately)
     socket.on('chat-message', (data) => {
       renderChatMessage({ id: data.id, userName: data.userName, avatar: data.avatar, message: data.message, type: data.type, timestamp: data.timestamp });
     });
@@ -193,119 +160,132 @@ document.addEventListener('DOMContentLoaded', () => {
       if (isTyping) showTyping(id, tname); else hideTyping(id);
     });
 
+    // emit join
     socket.emit('join', { roomId, userName, avatar: myAvatar });
   }
 
-  // WebRTC helpers
+  // WebRTC helpers - fixed, stable
   function createRemoteElement(peerId) {
-    const wrapper = document.createElement('div'); wrapper.className = 'video-card'; wrapper.id = 'peer-'+peerId;
+    const wrapper = document.createElement('div'); wrapper.className = 'video-card'; wrapper.id = 'peer-' + peerId;
     const label = document.createElement('p'); label.style.margin='0 0 8px 0'; label.textContent = 'Peer: ' + peerId;
-    const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; v.style.width='320px'; v.style.height='180px'; v.style.borderRadius='8px';
+    const v = document.createElement('video'); v.autoplay = true; v.playsInline = true;
+    v.style.width='320px'; v.style.height='180px'; v.style.borderRadius='8px';
     wrapper.appendChild(label); wrapper.appendChild(v);
     videos.appendChild(wrapper);
-    remoteEls[peerId] = { wrapper, video: v };
-    return v;
+    return { wrapper, video: v };
   }
 
   async function createPeerConnection(peerId, isInitiator) {
-    // Nếu peer cũ chết -> tạo mới
+    // create or reuse
     if (!pcs[peerId]) {
-        const pc = new RTCPeerConnection({
-            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-        });
-        pcs[peerId] = pc;
+      const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+      pcs[peerId] = pc;
 
-        //-----------------------------------
-        // ADD LOCAL TRACKS
-        //-----------------------------------
-        if (localStream) {
-            localStream.getTracks().forEach(track => {
-                pc.addTrack(track, localStream);
-            });
+      // add local tracks (if available)
+      if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+      // ontrack: ensure remoteEl exists & set srcObject
+      pc.ontrack = (event) => {
+        console.log('[ontrack] from', peerId);
+        let remote = remoteEls[peerId];
+        if (!remote) {
+          remote = createRemoteElement(peerId);
+          remoteEls[peerId] = remote;
         }
+        remote.video.srcObject = event.streams[0];
+      };
 
-        //-----------------------------------
-        // RECEIVE REMOTE TRACK
-        //-----------------------------------
-        pc.ontrack = (event) => {
-            console.log("[ontrack] from", peerId);
+      pc.onicecandidate = (e) => {
+        if (e.candidate) socket.emit('ice-candidate', { to: peerId, candidate: e.candidate });
+      };
 
-            let remote = remoteEls[peerId];
-
-            // Nếu chưa có phần tử video -> tạo mới
-            if (!remote) {
-                remote = createRemoteElement(peerId);
-                remoteEls[peerId] = remote;
-            }
-
-            remote.video.srcObject = event.streams[0];
-        };
-
-        //-----------------------------------
-        // ICE CANDIDATE
-        //-----------------------------------
-        pc.onicecandidate = (e) => {
-            if (e.candidate) {
-                socket.emit("ice-candidate", {
-                    to: peerId,
-                    candidate: e.candidate
-                });
-            }
-        };
-
-        //-----------------------------------
-        // HANDLE FAIL
-        //-----------------------------------
-        pc.onconnectionstatechange = () => {
-            if (
-                pc.connectionState === "failed" ||
-                pc.connectionState === "disconnected" ||
-                pc.connectionState === "closed"
-            ) {
-                if (remoteEls[peerId]) {
-                    remoteEls[peerId].wrapper.remove();
-                    delete remoteEls[peerId];
-                }
-                try { pc.close(); } catch {}
-                delete pcs[peerId];
-            }
-        };
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
+          if (remoteEls[peerId]) { remoteEls[peerId].wrapper.remove(); delete remoteEls[peerId]; }
+          try { pc.close(); } catch (e) {}
+          delete pcs[peerId];
+        }
+      };
     }
 
     const pc = pcs[peerId];
 
-    //-----------------------------------
-    // INITIATOR CREATE OFFER
-    //-----------------------------------
     if (isInitiator) {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.emit("offer", { to: peerId, sdp: offer });
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit('offer', { to: peerId, sdp: offer });
     }
 
-      return pc;
+    return pc;
   }
 
+  // local media
   async function startLocalMedia() {
     if (localStream) return localStream;
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    localVideo.srcObject = localStream;
+    if (localVideo) localVideo.srcObject = localStream;
     return localStream;
   }
 
-  // Chat send (render locally then send to server to relay to others)
+  // Camera / Mic toggles
+  let camOn = true, micOn = true;
+
+  if (toggleCamBtn) {
+    toggleCamBtn.addEventListener('click', () => {
+      if (!localStream) return;
+      camOn = !camOn;
+      localStream.getVideoTracks().forEach(t => t.enabled = camOn);
+      toggleCamBtn.textContent = camOn ? 'Camera Off' : 'Camera On';
+      localVideo.style.filter = camOn ? 'none' : 'brightness(0)';
+    });
+  }
+
+  if (toggleMicBtn) {
+    toggleMicBtn.addEventListener('click', () => {
+      if (!localStream) return;
+      micOn = !micOn;
+      localStream.getAudioTracks().forEach(t => t.enabled = micOn);
+      toggleMicBtn.textContent = micOn ? 'Mic Off' : 'Mic On';
+    });
+  }
+
+  // screen share
+  if (screenShareBtn) {
+    screenShareBtn.addEventListener('click', async () => {
+      if (!localStream) return;
+      try {
+        const screen = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const screenTrack = screen.getVideoTracks()[0];
+        Object.values(pcs).forEach(pc => {
+          const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+          if (sender) sender.replaceTrack(screenTrack);
+        });
+        screenTrack.onended = () => {
+          const cam = localStream.getVideoTracks()[0];
+          Object.values(pcs).forEach(pc => {
+            const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+            if (sender) sender.replaceTrack(cam);
+          });
+        };
+      } catch (e) {
+        console.warn('screen share cancelled', e);
+      }
+    });
+  }
+
+  // Chat send + typing
   function sendChatText() {
     const txt = chatInput.value.trim();
     if (!txt || !socket) return;
+    // render locally
     renderChatMessage({ id: myId, userName, avatar: myAvatar, message: txt, type: 'text', timestamp: Date.now() });
+    // send to others (server forwards to others only)
     socket.emit('chat-message', { roomId, userName, avatar: myAvatar, message: txt, type: 'text' });
     chatInput.value = '';
     sendTyping(false);
   }
 
-  // typing
-  let typingTimer = null;
-  let amTyping = false;
+  let typingTimer = null, amTyping = false;
   function sendTyping(flag) {
     if (!socket) return;
     if (flag) {
@@ -321,8 +301,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (themeSelect) {
     themeSelect.addEventListener('change', () => {
       const v = themeSelect.value;
-      document.body.className = v;
-      if (themeLabel) themeLabel.textContent = v === 'romantic' ? 'Romantic' : 'Basic';
+      document.body.className = v === 'love' ? 'love' : 'work';
+      if (themeLabel) themeLabel.textContent = v === 'love' ? 'Love' : 'Work';
     });
   }
 
@@ -337,9 +317,11 @@ document.addEventListener('DOMContentLoaded', () => {
       roomId = roomInput.value || 'room1';
       userName = nameInput.value || 'Guest';
       myAvatar = defaultAvatar(userName);
+
       await startLocalMedia();
       renderStickers();
       initSocket();
+
       joinBtn.disabled = true; leaveBtn.disabled = false;
     });
   }
@@ -357,44 +339,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  toggleCamBtn.addEventListener('click', () => {
-    //alert("hello");
-    if (!localStream) return;
-
-    camOn = !camOn;
-
-    localStream.getVideoTracks().forEach(t => t.enabled = camOn);
-
-    if (camOn) {
-      toggleCamBtn.textContent = "Camera Off";
-      localVideo.style.filter = "none";
-    } else {
-      toggleCamBtn.textContent = "Camera On";
-      localVideo.style.filter = "brightness(0)";  // đen màn
-    }
-  });
-
-  toggleMicBtn.addEventListener('click', () => {
-    if (!localStream) return;
-
-    micOn = !micOn;
-
-    localStream.getAudioTracks().forEach(t => t.enabled = micOn);
-
-    toggleMicBtn.textContent = micOn ? "Mic Off" : "Mic On";
-  });
-
   function renderStickers() {
     if (!stickerPalette) return;
     stickerPalette.innerHTML = '';
     STICKERS.forEach(u => {
       const img = document.createElement('img'); img.src = u; img.className = 'sticker'; img.title = 'Send sticker';
       img.addEventListener('click', () => {
-        // local render + emit
         renderChatMessage({ id: myId, userName, avatar: myAvatar, message: u, type: 'sticker', timestamp: Date.now() });
-        socket.emit('chat-message', { roomId, userName, avatar: myAvatar, message: u, type: 'sticker' });
+        socket && socket.emit('chat-message', { roomId, userName, avatar: myAvatar, message: u, type: 'sticker' });
       });
       stickerPalette.appendChild(img);
     });
   }
-});
+
+})();

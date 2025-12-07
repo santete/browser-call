@@ -12,7 +12,7 @@ app.use(express.static('public'));
 // rooms map: roomId -> Set(socketId)
 const rooms = new Map();
 
-io.on('connection', (socket) => {
+io.on('connection', socket => {
   console.log('connected', socket.id);
 
   socket.on('join', ({ roomId, userName, avatar }) => {
@@ -23,7 +23,7 @@ io.on('connection', (socket) => {
     if (!rooms.has(roomId)) rooms.set(roomId, new Set());
     const set = rooms.get(roomId);
 
-    // inform existing peers about new user
+    // notify existing peers about new user
     socket.to(roomId).emit('user-joined', { id: socket.id, userName: socket.data.userName, avatar: socket.data.avatar });
 
     // send joined event to the joining peer: your id + peers list
@@ -39,7 +39,7 @@ io.on('connection', (socket) => {
   socket.on('answer', ({ to, sdp }) => io.to(to).emit('answer', { from: socket.id, sdp }));
   socket.on('ice-candidate', ({ to, candidate }) => io.to(to).emit('ice-candidate', { from: socket.id, candidate }));
 
-  // Chat: relay to others in the same room (exclude sender) -> prevents duplicate
+  // Chat: relay to others in same room (exclude sender) -> prevents duplicate
   socket.on('chat-message', ({ roomId, userName, avatar, message, type }) => {
     socket.to(roomId).emit('chat-message', {
       id: socket.id,
