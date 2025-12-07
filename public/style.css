@@ -11,7 +11,7 @@
 }
 
 /* LOVE theme overrides (applied when body has class "love") */
-body.love, body[class="love"] {
+body.romantic, body[class="romantic"] {
   --bg: #fff6fb;
   --card: #fff;
   --muted: #9b6b83;
@@ -51,7 +51,7 @@ body.love, body[class="love"] {
 }
 
 /* WORK theme */
-body.work, body[class="work"] {
+body.basic, body[class="basic"] {
   --bg:#f1f5fb;
   --card:#ffffff;
   --muted:#475569;
