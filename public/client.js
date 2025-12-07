@@ -1,5 +1,44 @@
 // public/client.js
 // Clean client: join/leave, WebRTC mesh (small groups), chat (no duplicate), stickers, typing, theme switch
+import { signInWithGoogle, signOut, getCurrentUser } from './supabase.js';
+const loginBtn = document.getElementById('loginBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const userInfo = document.getElementById('userInfo');
+
+
+async function refreshAuthUI() {
+const user = await getCurrentUser();
+if (user) {
+loginBtn.classList.add('hidden');
+logoutBtn.classList.remove('hidden');
+userInfo.classList.remove('hidden');
+
+
+userInfo.innerHTML = `
+<img src="${user.user_metadata.avatar_url}" class="avatar" />
+<span>${user.user_metadata.full_name}</span>
+`;
+} else {
+loginBtn.classList.remove('hidden');
+logoutBtn.classList.add('hidden');
+userInfo.classList.add('hidden');
+}
+}
+
+
+loginBtn.onclick = async () => {
+await signInWithGoogle();
+};
+
+
+logoutBtn.onclick = async () => {
+await signOut();
+refreshAuthUI();
+};
+
+
+// Refresh UI khi vào trang hoặc redirect from Google
+refreshAuthUI();
 
 document.addEventListener('DOMContentLoaded', () => {
   // DOM

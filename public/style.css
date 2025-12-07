@@ -29,6 +29,26 @@ body.love, body[class="love"] {
   background: #fff;
   cursor: pointer;
 }
+/* button login with gg */
+.btn {
+  background: #4285f4;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.hidden { display: none; }
+.user-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
 
 /* WORK theme */
 body.work, body[class="work"] {
