@@ -208,34 +208,82 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function createPeerConnection(peerId, isInitiator) {
-    if (pcs[peerId]) return pcs[peerId];
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-    pcs[peerId] = pc;
+    // Nếu peer cũ chết -> tạo mới
+    if (!pcs[peerId]) {
+        const pc = new RTCPeerConnection({
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+        });
+        pcs[peerId] = pc;
 
-    if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+        //-----------------------------------
+        // ADD LOCAL TRACKS
+        //-----------------------------------
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
+                pc.addTrack(track, localStream);
+            });
+        }
 
-    pc.ontrack = (e) => {
-      const v = (remoteEls[peerId]?.video) || createRemoteElement(peerId);
-      v.srcObject = e.streams[0];
-    };
+        //-----------------------------------
+        // RECEIVE REMOTE TRACK
+        //-----------------------------------
+        pc.ontrack = (event) => {
+            console.log("[ontrack] from", peerId);
 
-    pc.onicecandidate = (e) => { if (e.candidate) socket.emit('ice-candidate', { to: peerId, candidate: e.candidate }); };
+            let remote = remoteEls[peerId];
 
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        if (remoteEls[peerId]) { remoteEls[peerId].wrapper.remove(); delete remoteEls[peerId]; }
-        try { pc.close(); } catch (e) {}
-        delete pcs[peerId];
-      }
-    };
+            // Nếu chưa có phần tử video -> tạo mới
+            if (!remote) {
+                remote = createRemoteElement(peerId);
+                remoteEls[peerId] = remote;
+            }
 
-    if (isInitiator) {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      socket.emit('offer', { to: peerId, sdp: offer });
+            remote.video.srcObject = event.streams[0];
+        };
+
+        //-----------------------------------
+        // ICE CANDIDATE
+        //-----------------------------------
+        pc.onicecandidate = (e) => {
+            if (e.candidate) {
+                socket.emit("ice-candidate", {
+                    to: peerId,
+                    candidate: e.candidate
+                });
+            }
+        };
+
+        //-----------------------------------
+        // HANDLE FAIL
+        //-----------------------------------
+        pc.onconnectionstatechange = () => {
+            if (
+                pc.connectionState === "failed" ||
+                pc.connectionState === "disconnected" ||
+                pc.connectionState === "closed"
+            ) {
+                if (remoteEls[peerId]) {
+                    remoteEls[peerId].wrapper.remove();
+                    delete remoteEls[peerId];
+                }
+                try { pc.close(); } catch {}
+                delete pcs[peerId];
+            }
+        };
     }
 
-    return pc;
+    const pc = pcs[peerId];
+
+    //-----------------------------------
+    // INITIATOR CREATE OFFER
+    //-----------------------------------
+    if (isInitiator) {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit("offer", { to: peerId, sdp: offer });
+    }
+
+      return pc;
   }
 
   async function startLocalMedia() {
