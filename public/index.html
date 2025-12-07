@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WebRTC + Chat — Work / Love Theme</title>
+  <title>The friends + Chat + Entertainment — Basic / Romantic Theme</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <style>
@@ -11,9 +11,9 @@
     body { font-family: Inter, system-ui, Arial; }
   </style>
 </head>
-<body class="work"> <!-- default theme: work -->
+<body class="basic"> <!-- default theme: work -->
   <div class="topbar">
-    <h2>WebRTC + Chat</h2>
+    <h2>The friends</h2>
     <div class="controls">
       <label>Room: <input id="roomId" type="text" value="room1"></label>
       <label>Name: <input id="name" type="text" value="Guest"></label>
@@ -24,8 +24,8 @@
       <button id="toggleMicBtn">Mic Off</button>
       
       <select id="themeSelect" aria-label="theme">
-        <option value="work">Work</option>
-        <option value="love">Love</option>
+        <option value="basic">Basic</option>
+        <option value="romantic">Romantic</option>
       </select>
       <!-- Login with gg via supabase -->
       <button id="loginBtn" class="btn">Login with Google</button>
@@ -42,12 +42,12 @@
   <div class="layout">
     <main class="left">
       <section class="video-card">
-        <h3>Local</h3>
+        <h3>Your camera</h3>
         <video id="localVideo" autoplay muted playsinline></video>
       </section>
 
       <section class="video-card">
-        <h3>Remotes</h3>
+        <h3>The friends</h3>
         <div id="videos" class="remote-list"></div>
       </section>
     </main>
@@ -55,7 +55,7 @@
     <aside class="chat-panel">
       <div class="chat-header">
         <div class="title">💬 Chat (iMessage style)</div>
-        <div class="muted">Theme: <span id="themeLabel">Work</span></div>
+        <div class="muted">Theme: <span id="themeLabel">Basic</span></div>
       </div>
 
       <div id="chatMessages" class="chat-messages"></div>
