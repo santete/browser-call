@@ -3,9 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>The friends + Chat + Entertainment — Basic / Romantic Theme</title>
+  <title>Chat with friends and Enjoyed the moment</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="apple-touch-icon" href="/favicon.png" />
+  <meta name="theme-color" content="#ffffff" />
   <style>
     /* small fallback if CSS not loaded quickly */
     body { font-family: Inter, system-ui, Arial; }
@@ -13,7 +16,7 @@
 </head>
 <body class="basic"> <!-- default theme: work -->
   <div class="topbar">
-    <h2>The friends</h2>
+    <h2>Free chat with new friend, without login</h2>
     <div class="controls">
       <label>Room: <input id="roomId" type="text" value="room1"></label>
       <label>Name: <input id="name" type="text" value="Guest"></label>
@@ -42,12 +45,12 @@
   <div class="layout">
     <main class="left">
       <section class="video-card">
-        <h3>Your camera</h3>
+        <h3>Local</h3>
         <video id="localVideo" autoplay muted playsinline></video>
       </section>
 
       <section class="video-card">
-        <h3>The friends</h3>
+        <h3>Remotes</h3>
         <div id="videos" class="remote-list"></div>
       </section>
     </main>
