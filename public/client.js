@@ -141,6 +141,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+	// Ví dụ trong client.js khi render tin nhắn:
+	function addMessageToUI(msg, isMyMessage) {
+	  const div = document.createElement('div');
+	  
+	  // Thêm class chung và class phân biệt
+	  div.classList.add('message-item'); 
+	  if (isMyMessage) {
+		div.classList.add('message-self');
+	  } else {
+		div.classList.add('message-other');
+	  }
+	  
+	  div.textContent = msg.text; // Hoặc nội dung chat
+	  document.getElementById('chatMessages').appendChild(div);
+	  
+	  // Auto scroll xuống dưới
+	  document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+	}
+
   // Socket + signaling handlers
   function initSocket() {
     socket = io();
