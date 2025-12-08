@@ -1,130 +1,313 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-
-:root{
-  --bg:#f3f7fb;
-  --card:#ffffff;
-  --muted:#6b7280;
-  --primary:#0b74ff;
-  --bubble-me-start:#64b5ff;
-  --bubble-me-end:#0b74ff;
-  --bubble-other:#f1f6fb;
+/* --- 1. BIẾN MÀU SẮC & CÀI ĐẶT CHUNG --- */
+:root {
+  --primary: #6366f1;       /* Màu tím chủ đạo */
+  --bg-body: #f3f4f6;       /* Nền tổng thể */
+  --bg-video: #111827;      /* Nền đen cho khu vực video */
+  --bg-chat: #ffffff;       /* Nền trắng cho khung chat */
+  
+  /* Màu tin nhắn */
+  --msg-me-bg: #6366f1;     /* Tin của mình: Màu tím */
+  --msg-me-text: #ffffff;   /* Chữ trắng */
+  --msg-other-bg: #e5e7eb;  /* Tin người khác: Màu xám */
+  --msg-other-text: #1f2937;/* Chữ đen */
 }
 
-/* LOVE theme overrides (applied when body has class "love") */
-body.romantic, body[class="romantic"] {
-  --bg: #fff6fb;
-  --card: #fff;
-  --muted: #9b6b83;
-  --primary: #ff4d88;
-  --bubble-me-start: #ff9cc4;
-  --bubble-me-end: #ff4d88;
-  --bubble-other: #fff0f6;
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-body);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Chặn cuộn trang web, chỉ cuộn nội dung con */
 }
 
-/* button off camera, off mic*/
-#toggleCamBtn, #toggleMicBtn {
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid #d0d7e2;
-  background: #fff;
-  cursor: pointer;
-}
-/* button login with gg */
-.btn {
-  background: #4285f4;
-  color: white;
-  padding: 10px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-.hidden { display: none; }
-.user-box {
+/* --- 2. THANH HEADER (TOPBAR) --- */
+.topbar {
+  height: 60px;
+  background: white;
+  border-bottom: 1px solid #ddd;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  flex-shrink: 0; /* Không cho co lại */
+  z-index: 10;
+}
+
+.topbar h2 {
+  font-size: 1rem;
+  color: var(--primary);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.controls button, .controls input, .controls select {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* Các nút màu mè */
+#joinBtn { background: var(--primary); color: white; border: none; }
+#leaveBtn { background: #ef4444; color: white; border: none; }
+#loginBtn { background: #2563eb; color: white; border: none; }
+
+.hidden { display: none !important; }
+.user-box img.avatar { width: 28px; height: 28px; border-radius: 50%; vertical-align: middle; margin-right: 5px;}
+
+/* --- 3. LAYOUT CHÍNH (QUAN TRỌNG) --- */
+.layout {
+  display: flex;
+  flex: 1; /* Chiếm hết chiều cao còn lại */
+  height: calc(100vh - 60px);
+}
+
+/* --- 4. CỘT VIDEO (BÊN TRÁI) - THU NHỎ LẠI --- */
+.left {
+  width: 320px; /* Cố định chiều rộng nhỏ */
+  min-width: 250px;
+  background-color: var(--bg-video);
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  margin-top: 10px;
+  padding: 10px;
+  overflow-y: auto;
+  border-right: 1px solid #333;
 }
-.avatar {
-  width: 40px;
-  height: 40px;
+
+.video-card h3 {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+/* Camera của mình */
+#localVideo {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 2px solid rgba(99, 102, 241, 0.5);
+  background: black;
+  transform: scaleX(-1); /* Lật gương */
+}
+
+/* Camera người khác */
+.remote-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.remote-list video {
+  width: 100%;
+  border-radius: 8px;
+  background: black;
+}
+
+/* --- 5. KHUNG CHAT (BÊN PHẢI) --- */
+.chat-panel {
+  flex: 1; 
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-chat);
+  position: relative;
+}
+
+.chat-header {
+  padding: 10px 15px;
+  border-bottom: 1px solid #eee;
+  background: #f9fafb;
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 15px; /* Giảm padding một chút */
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* Khoảng cách giữa các tin nhắn gần hơn */
+}
+
+/* --- 6. STYLE TIN NHẮN (MESSAGE ROW) --- */
+.msg-row {
+  display: flex;
+  align-items: flex-end; /* Avatar nằm dưới đáy dòng */
+  max-width: 100%;
+  margin-bottom: 4px;
+}
+
+/* Avatar chat - CHỈNH SỬA: Hiện cho cả 2 bên */
+.msg-avatar {
+  width: 28px;  /* Nhỏ lại (cũ 32px) */
+  height: 28px;
   border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #eee;
+  flex-shrink: 0;
 }
 
-/* WORK theme */
-body.basic, body[class="basic"] {
-  --bg:#f1f5fb;
-  --card:#ffffff;
-  --muted:#475569;
-  --primary:#0b74ff;
-  --bubble-me-start:#64b5ff;
-  --bubble-me-end:#0b74ff;
-  --bubble-other:#eef6ff;
+/* Container chứa bong bóng chat và giờ */
+.msg-row > div {
+  max-width: 75%; /* Giới hạn độ dài tin nhắn */
+  display: flex;
+  flex-direction: column;
 }
 
-/* Base layout */
-body {
-  font-family: Inter, system-ui, Arial;
-  margin: 0;
-  background: var(--bg);
-  color: #06202a;
-  padding: 18px;
+/* Bong bóng chat - CHỈNH SỬA: Font chữ nhỏ hơn */
+.bubble {
+  padding: 8px 12px; /* Padding gọn hơn */
+  border-radius: 16px;
+  font-size: 13px; /* Font chữ nhỏ lại (cũ ~15px) */
+  line-height: 1.4;
+  word-wrap: break-word;
 }
 
-/* Topbar */
-.topbar { display:flex; gap:12px; align-items:center; margin-bottom:14px; }
-.controls { margin-left:auto; display:flex; gap:8px; align-items:center; }
-.controls input { padding:8px 10px; border-radius:8px; border:1px solid #e6eef6; }
-.controls select { padding:8px 10px; border-radius:8px; border:1px solid #e6eef6; }
+/* === TIN NHẮN NGƯỜI KHÁC (Bên Trái) === */
+.msg-row:not(.end) {
+  align-self: flex-start;
+}
+.msg-row:not(.end) .msg-avatar {
+  margin-right: 8px; /* Cách bong bóng chat ra */
+}
+.msg-row:not(.end) .bubble {
+  background-color: var(--msg-other-bg);
+  color: var(--msg-other-text);
+  border-bottom-left-radius: 4px;
+}
 
-/* Layout */
-.layout { display:flex; gap:18px; align-items:flex-start; }
-.left { flex:1; }
+/* === TIN NHẮN CỦA MÌNH (Bên Phải) === */
+.msg-row.end {
+  align-self: flex-end;
+  /* Quan trọng: JS của bạn đang append [Box] rồi đến [Avatar] 
+     nên không cần row-reverse, chỉ cần căn phải */
+  justify-content: flex-end; 
+}
 
-/* Video card */
-.video-card { background:var(--card); border-radius:12px; padding:12px; box-shadow:0 8px 30px rgba(2,6,23,0.06); margin-bottom:12px; }
-video { width:100%; max-width:640px; height:360px; background:#000; border-radius:10px; display:block; }
+.msg-row.end .msg-avatar {
+  display: block !important; /* BẮT BUỘC HIỆN */
+  margin-left: 8px; /* Cách bong bóng chat ra */
+  margin-right: 0;
+}
 
-/* Chat panel */
-.chat-panel { width:380px; background:var(--card); border-radius:14px; padding:12px; box-shadow:0 12px 40px rgba(2,6,23,0.06); }
-.chat-header { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
-.title { font-weight:700; font-size:18px; }
-.muted { color:var(--muted); font-size:13px; margin-left:auto; }
+.msg-row.end > div {
+  align-items: flex-end; /* Căn lề phải cho khối nội dung */
+}
 
-/* Messages area */
-.chat-messages { height:420px; overflow:auto; padding:14px; border-radius:12px; background: linear-gradient(180deg,#ffffff,#fbfdff); border:1px solid rgba(10,20,40,0.02); }
+.msg-row.end .bubble {
+  background-color: var(--msg-me-bg);
+  color: var(--msg-me-text);
+  border-bottom-right-radius: 4px;
+  text-align: left; /* Chữ vẫn căn trái cho dễ đọc */
+}
 
-/* Message rows */
-.msg-row { display:flex; align-items:flex-end; gap:10px; margin-bottom:12px; }
-.msg-row.end { justify-content:flex-end; }
-.msg-avatar { width:44px; height:44px; border-radius:50%; object-fit:cover; box-shadow:0 6px 18px rgba(2,6,23,0.06); }
+/* Thời gian */
+.msg-time {
+  font-size: 10px; /* Nhỏ xíu */
+  color: #9ca3af;
+  margin-top: 2px;
+}
 
-/* bubble styles */
-.bubble { max-width:76%; padding:10px 14px; border-radius:18px; box-shadow:0 8px 20px rgba(2,6,23,0.06); font-size:15px; line-height:1.3; word-break:break-word; }
-.bubble.me { background: linear-gradient(135deg, var(--bubble-me-start), var(--bubble-me-end)); color: #fff; border-bottom-right-radius:6px; }
-.bubble.other { background: var(--bubble-other); color: #06202a; border-bottom-left-radius:6px; }
+/* === STICKER FIX (QUAN TRỌNG) === */
+.bubble .sticker {
+  max-width: 80px !important; /* Giới hạn nhỏ lại (cũ 120px) */
+  height: auto;
+  display: block;
+  border-radius: 8px;
+}
 
-.msg-time { font-size:12px; color:var(--muted); margin-top:6px; }
+/* Sticker thì bỏ màu nền bong bóng */
+.bubble:has(.sticker) {
+  background: transparent !important;
+  padding: 0;
+}
 
-/* typing */
-.typing { font-style:italic; color:var(--muted); margin:8px 0; }
+/* Thanh nhập liệu */
+.chat-input {
+  padding: 10px;
+  border-top: 1px solid #eee;
+  display: flex;
+  gap: 8px;
+  background: white;
+  align-items: center;
+}
 
-/* sticker */
-.sticker { width:72px; height:72px; border-radius:10px; object-fit:cover; cursor:pointer; }
+#chatInput {
+  flex: 1;
+  border-radius: 20px;
+  padding: 8px 12px;
+  font-size: 13px; /* Input chữ cũng nhỏ lại cho đồng bộ */
+  border: 1px solid #ddd;
+  background: #f3f4f6;
+  outline: none;
+}
+#sendChatBtn {
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 13px;
+  height: 34px; /* Fix chiều cao nút */
+}
 
-/* input */
-.chat-input { display:flex; gap:8px; margin-top:12px; align-items:center; }
-.chat-input input { flex:1; padding:10px 12px; border-radius:999px; border:1px solid #e6eef6; }
-.chat-input button { padding:10px 14px; border-radius:999px; border:none; background:var(--primary); color:#fff; cursor:pointer; }
+/* Sticker Palette - Chỉnh lại cho đẹp luôn */
+.sticker-palette {
+  padding: 8px;
+  display: flex;
+  gap: 10px;
+  background: #f9fafb;
+}
+.sticker-palette .sticker {
+  width: 32px; /* Icon chọn sticker nhỏ lại */
+  height: 32px;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.sticker-palette .sticker:hover { transform: scale(1.1); }
 
-/* sticker palette container */
-.sticker-palette { display:flex; gap:8px; margin-top:10px; }
+/* --- 8. MOBILE RESPONSIVE (ĐIỆN THOẠI) --- */
+@media (max-width: 768px) {
+  /* Ẩn bớt nút không cần thiết trên header */
+  .topbar h2 { display: none; }
+  .controls { width: 100%; justify-content: space-between; }
+  .controls input { width: 80px; }
+  
+  /* Layout dọc: Video trên, Chat dưới */
+  .layout {
+    flex-direction: column;
+  }
+  
+  /* Cột Video thành hàng ngang nhỏ ở trên */
+  .left {
+    width: 100%;
+    height: 160px; /* Chiều cao cố định nhỏ */
+    flex-direction: row; /* Xếp video ngang */
+    padding: 5px;
+    border-right: none;
+    border-bottom: 1px solid #333;
+    overflow-x: auto; /* Cuộn ngang nếu nhiều video */
+  }
+  
+  /* Video con nhỏ lại */
+  #localVideo { height: 100%; width: auto; max-width: 120px; }
+  .remote-list { flex-direction: row; gap: 5px; }
+  .remote-list video { height: 100%; width: auto; max-width: 150px; }
+  .video-card { width: auto; }
+  .video-card h3 { display: none; }
 
-/* remote video cards */
-.remote-list { display:flex; flex-wrap:wrap; gap:12px; }
-
-/* responsive */
-@media (max-width:900px){
-  .layout { flex-direction:column; }
-  .chat-panel { width:100%; }
-  .video-card video { max-width:100%; height:auto; }
+  /* Khung chat chiếm phần còn lại */
+  .chat-panel {
+    height: calc(100% - 160px);
+  }
 }
