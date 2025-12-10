@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Chat with friends and Enjoyed the moment</title>
+  <title>Room</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link rel="icon" type="image/png" href="/favicon.png" />
@@ -16,10 +16,10 @@
 </head>
 <body class="basic"> <!-- default theme: work -->
   <div class="topbar">
-    <h2>Free chat with new friend, without login</h2>
+    <h2>Tin nhắn bạn bè</h2>
     <div class="controls">
       <label>Room: <input id="roomId" type="text" value="room1"></label>
-      <label>Name: <input id="name" type="text" value="Guest"></label>
+      <label>Nickname: <input id="name" type="text" value="Guest"></label>
       <button id="joinBtn">Join</button>
       <button id="leaveBtn" disabled>Leave</button>
       <!-- NEW -->
@@ -43,34 +43,82 @@
   </div>
 
   <div class="layout">
-    <main class="left">
-      <section class="video-card">
-        <h3>Local</h3>
-        <video id="localVideo" autoplay muted playsinline></video>
-      </section>
-
-      <section class="video-card">
-        <h3>Remotes</h3>
+    <aside class="left">
+  
+      <div class="camera-section">
+        <div class="video-card">
+          <video id="localVideo" autoplay muted playsinline></video>
+          <div class="cam-label">Bạn</div>
+        </div>
         <div id="videos" class="remote-list"></div>
-      </section>
-    </main>
+      </div>
+
+      <div class="room-section">
+        <div class="room-header">
+          <div class="header-left">
+            <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+            </svg>
+            <span>Cộng đồng</span>
+          </div>
+
+          <button id="refreshRoomsBtn" class="action-btn" title="Làm mới danh sách">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 4v6h-6"></path>
+              <path d="M1 20v-6h6"></path>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <div id="roomListContainer" class="room-tree">
+            </div>
+      </div>
+
+    </aside>
 
     <aside class="chat-panel">
       <div class="chat-header">
-        <div class="title">💬 Chat (iMessage style)</div>
-        <div class="muted">Theme: <span id="themeLabel">Basic</span></div>
+        <div class="chat-info">
+          <div class="room-name" id="currentRoomName"># Hà Nội Phố</div>
+          <div class="room-status">
+            <span class="status-dot"></span> Đang hoạt động
+          </div>
+        </div>
+        <button class="option-btn">⋮</button>
       </div>
 
-      <div id="chatMessages" class="chat-messages"></div>
-
-      <div id="stickerPalette" class="sticker-palette"></div>
-
-      <div class="chat-input">
-        <input id="chatInput" type="text" placeholder="Nhập tin nhắn..." />
-        <button id="sendChatBtn">Gửi</button>
+      <div id="chatMessages" class="chat-messages">
+        <div class="empty-state">
+          <div class="empty-icon">👋</div>
+          <p>Bắt đầu cuộc trò chuyện ngay!</p>
+        </div>
       </div>
 
-      <div id="typingIndicator" class="typing" style="display:none;"></div>
+      <div id="typingIndicator" class="typing-indicator hidden">
+        <span></span><span></span><span></span>
+      </div>
+
+      <div id="stickerPalette" class="sticker-popup hidden">
+        </div>
+
+      <div class="chat-input-area">
+        <input type="file" id="fileInput" hidden accept="image/*">
+        <button id="attachBtn" class="tool-btn" title="Gửi ảnh">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+        </button>
+
+        <button id="stickerBtn" class="tool-btn" title="Gửi Sticker">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+        </button>
+
+        <input id="chatInput" type="text" placeholder="Nhập tin nhắn..." autocomplete="off" />
+        
+        <button id="sendChatBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
     </aside>
   </div>
 

@@ -75,47 +75,310 @@ body {
   height: calc(100vh - 60px);
 }
 
-/* --- 4. CỘT VIDEO (BÊN TRÁI) - THU NHỎ LẠI --- */
+/* --- SỬA LẠI CỘT TRÁI --- */
 .left {
-  width: 320px; /* Cố định chiều rộng nhỏ */
-  min-width: 250px;
-  background-color: var(--bg-video);
+  width: 300px; /* Độ rộng cố định */
+  min-width: 260px;
+  background-color: #1a1a2e; /* Màu tím than đậm kiểu Yahoo 9.0 */
+  display: flex;
+  flex-direction: column; /* Xếp dọc: Camera trên, List dưới */
+  border-right: 1px solid #333;
+  padding: 0; /* Bỏ padding chung để scroll đẹp hơn */
+  height: 100%; /* Đảm bảo full chiều cao */
+}
+
+/* --- 1. KHU VỰC CAMERA (CỘT TRÁI - PHẦN TRÊN) --- */
+.camera-section {
+  flex: 0 0 auto;       /* Không tự co giãn, chiều cao dựa theo nội dung hoặc max-height */
+  max-height: 50%;      /* Chiếm tối đa 50% chiều cao cột trái */
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 10px;            /* Khoảng cách giữa cam mình và cam bạn */
   padding: 10px;
-  overflow-y: auto;
-  border-right: 1px solid #333;
+  background-color: #111; /* Nền tối để xem video rõ hơn */
+  border-bottom: 2px solid #333;
+  overflow-y: auto;     /* QUAN TRỌNG: Nếu nhiều người vào thì hiện thanh cuộn riêng ở đây */
 }
 
-.video-card h3 {
-  color: #9ca3af;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  margin-bottom: 5px;
+/* Tùy chỉnh thanh cuộn cho đẹp (Webkit browsers) */
+.camera-section::-webkit-scrollbar { width: 4px; }
+.camera-section::-webkit-scrollbar-thumb { background: #555; border-radius: 2px; }
+
+/* 1.1 Camera của mình (Luôn nằm trên cùng) */
+.video-card {
+  width: 100%;
+  flex-shrink: 0; /* Không bị bẹp dúm khi scroll */
+  position: relative;
 }
 
-/* Camera của mình */
 #localVideo {
   width: 100%;
-  height: auto;
+  height: auto;       /* Tự chỉnh theo tỷ lệ cam */
+  aspect-ratio: 16/9; /* Ép tỷ lệ màn hình rộng */
   border-radius: 8px;
-  border: 2px solid rgba(99, 102, 241, 0.5);
+  border: 1px solid #6366f1; /* Viền tím nhận diện mình */
   background: black;
   transform: scaleX(-1); /* Lật gương */
+  display: block;
 }
 
-/* Camera người khác */
+.cam-label {
+  position: absolute;
+  bottom: 5px; left: 5px;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* 1.2 Danh sách Camera người khác (Nằm dưới) */
 .remote-list {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: column; /* Xếp dọc */
+  gap: 10px;              /* Cách nhau 10px */
+}
+
+/* Style cho video người khác (JS sẽ tạo ra thẻ div class video-card vào đây) */
+.remote-list .video-card {
+  width: 100%;
 }
 
 .remote-list video {
   width: 100%;
+  aspect-ratio: 16/9;
   border-radius: 8px;
+  border: 1px solid #444;
   background: black;
+  display: block;
+}
+
+/* --- 2. KHU VỰC DANH SÁCH PHÒNG (STYLE HIỆN ĐẠI) --- */
+.room-section {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background-color: #f3f4f6;
+  user-select: none; /* Chống bôi đen chữ khi click nhiều */
+}
+
+/* --- HEADER PHÒNG CHAT (RE-DESIGN) --- */
+.room-header {
+  padding: 15px 20px; /* Tăng padding cho thoáng */
+  background: #ffffff;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky; top: 0; z-index: 10;
+  box-shadow: 0 4px 6px -4px rgba(0,0,0,0.05); /* Bóng mờ nhẹ bên dưới */
+}
+/* Phần tiêu đề bên trái */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 15px;
+  color: #1f2937; /* Màu chữ đậm chất lượng */
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.header-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--primary); /* Màu tím chủ đạo */
+}
+
+/* Nút Refresh (Action Button) */
+.action-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%; /* Hình tròn */
+  color: #9ca3af;     /* Màu xám nhạt mặc định */
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center; justify-content: center;
+}
+
+.action-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Hiệu ứng khi di chuột vào nút Refresh */
+.action-btn:hover {
+  background-color: #f3f4f6; /* Nền xám nhẹ */
+  color: var(--primary);     /* Đổi màu icon sang tím */
+  transform: rotate(180deg); /* Xoay vòng 180 độ */
+}
+
+.action-btn:active {
+  transform: scale(0.9) rotate(180deg); /* Nhấn xuống thì thu nhỏ xíu */
+}
+
+.room-tree {
+  padding: 10px;
+}
+
+/* KHỐI KHU VỰC (REGION GROUP) */
+.region-group {
+  margin-bottom: 12px;
+}
+
+/* Tiêu đề khu vực (Click để đóng mở) */
+.region-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+  padding: 6px 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+  text-transform: uppercase; /* Chữ in hoa cho giống Category */
+  letter-spacing: 0.5px;
+}
+
+.region-title:hover {
+  background-color: rgba(0,0,0,0.05);
+  color: #111;
+}
+
+/* Mũi tên điều hướng */
+.arrow-icon {
+  width: 10px;
+  height: 10px;
+  transition: transform 0.2s ease;
+  opacity: 0.6;
+}
+
+/* Khi đang mở thì xoay mũi tên xuống */
+.region-group.expanded .arrow-icon {
+  transform: rotate(90deg);
+}
+
+/* Khi đóng thì mũi tên chỉ sang phải (mặc định) */
+.region-group:not(.expanded) .arrow-icon {
+  transform: rotate(0deg);
+}
+
+/* Icon đại diện cho cộng đồng (Thay cho folder) */
+.community-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--primary); /* Icon màu tím */
+  fill: currentColor;
+}
+
+/* Container chứa danh sách phòng */
+.region-rooms {
+  display: none; /* Mặc định ẩn hoặc hiện tùy logic JS */
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+  padding-left: 8px; /* Thụt lề nhẹ */
+}
+
+/* Class này được JS thêm vào để hiện danh sách */
+.region-group.expanded .region-rooms {
+  display: flex;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+/* SỬA LẠI PHẦN NÀY TRONG style.css */
+
+/* Item phòng chat */
+.room-item {
+  padding: 8px 10px 8px 0;
+  font-size: 14px;
+  color: #6b7280;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center; /* Căn giữa dọc */
+  margin-left: 14px;
+  transition: all 0.2s;
+  /* Quan trọng: flex-start để các phần tử xếp từ trái qua */
+  justify-content: flex-start; 
+}
+
+/* Icon # trước tên phòng */
+.room-item::before {
+  content: "#";
+  font-size: 14px;
+  color: #9ca3af;
+  margin-right: 8px;
+  font-weight: bold;
+  margin-left: 8px; /* Thêm chút lề trái */
+  flex-shrink: 0; /* Không bị co lại */
+}
+
+/* Tên phòng - CHÌA KHÓA NẰM Ở ĐÂY */
+.room-name-text {
+  flex: 1; /* Chiếm TẤT CẢ khoảng trống còn lại */
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 10px; /* Cách số lượng ra một đoạn để không dính */
+  margin-left: 0;
+}
+
+/* Badge số lượng người */
+.user-count {
+  margin-left: auto; /* Đẩy badge dạt hẳn về phía bên phải cùng */
+  font-size: 11px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  padding: 2px 8px; /* Tăng padding ngang chút cho đẹp */
+  border-radius: 12px;
+  color: #666;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0; /* Không bao giờ bị co lại dù tên phòng dài */
+  white-space: nowrap;
+}
+
+/* Icon người nhỏ xíu trong badge count */
+.count-icon-svg {
+  width: 10px;
+  height: 10px;
+  fill: #9ca3af; /* Màu xám cho icon */
+}
+
+/* Hover effect */
+.room-item:hover {
+  background-color: #e0e7ff;
+  color: #1f2937;
+}
+
+/* Active state */
+.room-item.active {
+  background-color: #c7d2fe;
+  color: #312e81;
+}
+.room-item.active .user-count {
+  background-color: #eef2ff;
+  border-color: #c7d2fe;
+  color: #312e81;
+}
+.room-item.active .count-icon-svg {
+  fill: #4338ca; /* Icon đổi màu tím khi active */
+}
+
+/* Hiệu ứng hiện ra nhẹ nhàng */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* --- 5. KHUNG CHAT (BÊN PHẢI) --- */
@@ -235,46 +498,155 @@ body {
   padding: 0;
 }
 
-/* Thanh nhập liệu */
-.chat-input {
-  padding: 10px;
+/* --- HEADER CHAT --- */
+.chat-info .room-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111;
+}
+.chat-info .room-status {
+  font-size: 12px;
+  color: #10b981; /* Màu xanh lá online */
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.status-dot {
+  width: 8px; height: 8px;
+  background-color: #10b981;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* --- EMPTY STATE (Khi chưa chat gì) --- */
+.empty-state {
+  text-align: center;
+  margin-top: 50px;
+  color: #9ca3af;
+}
+.empty-icon { font-size: 40px; margin-bottom: 10px; }
+
+/* --- INPUT AREA HIỆN ĐẠI --- */
+.chat-input-area {
+  padding: 15px;
+  background: white;
   border-top: 1px solid #eee;
   display: flex;
-  gap: 8px;
-  background: white;
   align-items: center;
+  gap: 10px;
+  position: relative; /* Để căn vị trí popup sticker */
 }
+
+.tool-btn {
+  background: none; border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 8px;
+  border-radius: 50%;
+  transition: background 0.2s;
+  display: flex; align-items: center; justify-content: center;
+}
+.tool-btn:hover { background-color: #f3f4f6; color: var(--primary); }
+.tool-btn svg { width: 22px; height: 22px; }
 
 #chatInput {
   flex: 1;
+  background-color: #f3f4f6;
+  border: 1px solid transparent;
+  padding: 10px 15px;
   border-radius: 20px;
-  padding: 8px 12px;
-  font-size: 13px; /* Input chữ cũng nhỏ lại cho đồng bộ */
-  border: 1px solid #ddd;
-  background: #f3f4f6;
+  font-size: 14px;
   outline: none;
+  transition: all 0.2s;
 }
-#sendChatBtn {
-  border-radius: 20px;
-  padding: 6px 16px;
-  font-size: 13px;
-  height: 34px; /* Fix chiều cao nút */
-}
+#chatInput:focus { background: white; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,241,0.1); }
 
-/* Sticker Palette - Chỉnh lại cho đẹp luôn */
-.sticker-palette {
-  padding: 8px;
-  display: flex;
-  gap: 10px;
-  background: #f9fafb;
-}
-.sticker-palette .sticker {
-  width: 32px; /* Icon chọn sticker nhỏ lại */
-  height: 32px;
+#sendChatBtn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   transition: transform 0.1s;
 }
-.sticker-palette .sticker:hover { transform: scale(1.1); }
+#sendChatBtn svg { width: 20px; height: 20px; margin-left: -2px; margin-top: 2px; }
+#sendChatBtn:active { transform: scale(0.95); }
+
+/* --- STICKER POPUP (BẢNG CHỌN) --- */
+.sticker-popup {
+  position: absolute;
+  bottom: 60px; /* Nằm trên thanh input */
+  left: 10px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15); /* Bóng đổ đậm hơn chút cho nổi */
+  border-radius: 12px;
+  padding: 12px;
+  
+  /* QUAN TRỌNG: Tạo lưới hiển thị */
+  display: grid; 
+  grid-template-columns: repeat(4, 1fr); /* Chia làm 4 cột */
+  gap: 10px; /* Khoảng cách giữa các sticker */
+  
+  /* Giới hạn kích thước popup nếu quá nhiều sticker */
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 100;
+  width: 260px; /* Cố định chiều rộng popup */
+}
+
+/* Mũi tên trỏ xuống (Giữ nguyên hoặc chỉnh lại vị trí) */
+.sticker-popup::after {
+  content: ''; position: absolute;
+  bottom: -6px; left: 45px;
+  width: 12px; height: 12px;
+  background: white;
+  transform: rotate(45deg);
+  border-bottom: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb;
+}
+
+/* --- HÌNH STICKER BÊN TRONG POPUP --- */
+.sticker-popup .sticker {
+  width: 48px;  /* Ép cứng chiều rộng */
+  height: 48px; /* Ép cứng chiều cao */
+  object-fit: contain; /* Đảm bảo ảnh không bị méo */
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px;
+  transition: transform 0.2s, background 0.2s;
+}
+
+/* Hiệu ứng khi rê chuột vào sticker */
+.sticker-popup .sticker:hover {
+  background-color: #f3f4f6;
+  transform: scale(1.1); /* Phóng to nhẹ */
+}
+
+/* --- TYPING INDICATOR (3 dấu chấm nhảy) --- */
+.typing-indicator {
+  padding: 5px 15px;
+  font-size: 12px;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+.typing-indicator span {
+  width: 6px; height: 6px;
+  background-color: #9ca3af;
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+.typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+.typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
 
 /* --- 8. MOBILE RESPONSIVE (ĐIỆN THOẠI) --- */
 @media (max-width: 768px) {
