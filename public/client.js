@@ -60,6 +60,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const typingIndicator = document.getElementById('typingIndicator');
   const themeLabel = document.getElementById('themeLabel');
 
+  const currentRoomNameEl = document.getElementById('currentRoomName');
+  const stickerBtn = document.getElementById('stickerBtn');
+  const stickerPopup = document.getElementById('stickerPalette');
+  const attachBtn = document.getElementById('attachBtn');
+  const fileInput = document.getElementById('fileInput');
+
   // state
   let socket = null;
   let myId = null;
@@ -72,13 +78,187 @@ document.addEventListener('DOMContentLoaded', () => {
   const pcs = {};            // peerId -> RTCPeerConnection
   const remoteEls = {};      // peerId -> { wrapper, video }
 
-  // stickers
+  // --- LOGIC HIỂN THỊ DANH SÁCH PHÒNG (YAHOO STYLE) ---
+  
+  // 1. Dữ liệu giả lập (Sau này sẽ lấy từ API)
+  const REGIONS = [
+    {
+      name: "Hà Nội",
+      rooms: [
+        { id: "hn_1", name: "Hà Nội Phố", count: 12 },
+        { id: "hn_2", name: "Trà Chanh Chém Gió", count: 5 },
+        { id: "hn_3", name: "Hồ Gươm Sáng Sớm", count: 8 },
+        { id: "hn_4", name: "Hoàng Hôn Hồ Tây", count: 2 },
+        { id: "hn_5", name: "Cầu Giấy", count: 22 },
+        { id: "hn_6", name: "SVĐ Mỹ Đình", count: 1002 }
+      ]
+    },
+    {
+      name: "TP. Hồ Chí Minh",
+      rooms: [
+        { id: "sg_1", name: "Sài Gòn Cafe Sữa Đá", count: 20 },
+        { id: "sg_2", name: "Phố Đi Bộ Nguyễn Huệ", count: 15 },
+        { id: "sg_3", name: "Night Life District 1", count: 3 },
+        { id: "sg_4", name: "Phố Tây Bùi Viện", count: 39 },
+        { id: "sg_5", name: "Hồ Con Rùa", count: 50 },
+        { id: "sg_6", name: "Nhà Văn Hóa Thanh Niên", count: 100 },
+        { id: "sg_7", name: "Cầu Thủ Thêm", count: 12 },
+        { id: "sg_8", name: "Bến Bạch Đằng", count: 500 }
+      ]
+    },
+    {
+      name: "Góc Tâm Sự",
+      rooms: [
+        { id: "ts_1", name: "Tuổi Teen", count: 45 },
+        { id: "ts_2", name: "Thất Tình Quán", count: 2 },
+        { id: "ts_3", name: "Tìm Bạn Bốn Phương", count: 102 }
+      ]
+    },
+     {
+      name: "Miền Trung",
+      rooms: [
+        { id: "dn_1", name: "Đà Nẵng City", count: 9 },
+        { id: "hue_1", name: "Huế Mộng Mơ", count: 4 }
+      ]
+    }
+  ];
+
+  const roomListContainer = document.getElementById('roomListContainer');
+  const currentRoomId = roomInput.value; // Lấy phòng hiện tại
+
+  // --- LOGIC RENDER PHÒNG CHAT (CÓ COLLAPSE + ICON MỚI) ---
+  
+  // --- CẬP NHẬT HÀM RENDER ROOM LIST ---
+  
+  function renderRoomList() {
+    roomListContainer.innerHTML = '';
+
+    // Icon mũi tên
+    const arrowSvg = `<svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+    
+    // Icon Cộng đồng
+    const communitySvg = `<svg class="community-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`;
+
+    // Icon người nhỏ xíu (cho phần user count)
+    const userCountSvg = `<svg class="count-icon-svg" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
+
+    REGIONS.forEach((region, index) => {
+      const groupDiv = document.createElement('div');
+      groupDiv.className = 'region-group';
+      if (index === 0) groupDiv.classList.add('expanded');
+
+      // Header
+      const titleDiv = document.createElement('div');
+      titleDiv.className = 'region-title';
+      titleDiv.innerHTML = `${arrowSvg} ${communitySvg} <span>${region.name}</span>`;
+      titleDiv.addEventListener('click', () => groupDiv.classList.toggle('expanded'));
+      groupDiv.appendChild(titleDiv);
+
+      // List Rooms
+      const roomsDiv = document.createElement('div');
+      roomsDiv.className = 'region-rooms';
+
+      region.rooms.forEach(room => {
+        const roomDiv = document.createElement('div');
+        roomDiv.className = 'room-item';
+        if (room.id === currentRoomId) roomDiv.classList.add('active');
+
+        // 1. Tên phòng (Bọc trong span riêng để CSS căn trái)
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'room-name-text'; // Class mới để xử lý text
+        nameSpan.textContent = room.name;
+        
+        // 2. Số lượng người + Icon người
+        const countSpan = document.createElement('span');
+        countSpan.className = 'user-count';
+        // Chèn số trước, icon sau
+        countSpan.innerHTML = `${room.count} ${userCountSvg}`;
+
+        roomDiv.appendChild(nameSpan);
+        roomDiv.appendChild(countSpan);
+
+        roomDiv.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (room.id !== currentRoomId) {
+                 if (confirm(`Chuyển sang phòng: ${room.name}?`)) {
+                    window.location.href = `?room=${room.id}&name=${nameInput.value}`;
+                 }
+            }
+        });
+
+        roomsDiv.appendChild(roomDiv);
+      });
+
+      groupDiv.appendChild(roomsDiv);
+      roomListContainer.appendChild(groupDiv);
+    });
+  }
+
+  // Chạy ngay khi load trang
+  renderRoomList();
+
+  // 1. Cập nhật tên phòng trên Header khi vào
+  // (Bạn nhớ gọi dòng này khi joinRoom hoặc renderRoomList)
+  // Ví dụ: currentRoomNameEl.textContent = "# " + "Tên phòng từ biến roomName";
+
+  // 2. Xử lý nút Sticker (Bật/Tắt Popup)
+  stickerBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Ngăn click lan ra ngoài
+    stickerPopup.classList.toggle('hidden');
+  });
+
+  // Click ra ngoài thì đóng popup
+  document.addEventListener('click', (e) => {
+    if (!stickerPopup.contains(e.target) && e.target !== stickerBtn) {
+      stickerPopup.classList.add('hidden');
+    }
+  });
+  
+  // Khi chọn sticker xong thì cũng đóng luôn
+  // (Đã có logic renderSticker cũ, chỉ cần thêm dòng đóng popup vào đó)
+  
+  // 3. Xử lý nút Gửi Ảnh (Attach)
+  attachBtn.addEventListener('click', () => {
+    fileInput.click(); // Kích hoạt input file ẩn
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Demo: Đọc file ảnh và hiện lên chat ngay lập tức (Local)
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const imgUrl = evt.target.result;
+        
+        // Gửi như tin nhắn sticker (dạng ảnh)
+        // Lưu ý: Thực tế bạn cần upload lên Server lấy link, ở đây mình gửi base64 trực tiếp (chỉ test ảnh nhỏ)
+        const msgData = { 
+            id: myId, 
+            userName, 
+            avatar: myAvatar, 
+            message: imgUrl, 
+            type: 'sticker', // Tạm dùng type sticker để hiện ảnh
+            timestamp: Date.now() 
+        };
+        
+        // Render lên màn hình mình
+        renderChatMessage(msgData);
+        // Gửi qua socket
+        socket.emit('chat-message', msgData);
+      };
+      reader.readAsDataURL(file);
+    }
+    // Reset input để chọn lại file cũ được
+    fileInput.value = '';
+  });
+
+  // stickers logic chat cũ
   const STICKERS = [
     '/assets/stickers/heart.PNG',
     '/assets/stickers/smile.PNG',
     '/assets/stickers/fire.PNG'
   ];
-
+  renderStickers();
   // helpers
   const defaultAvatar = (name) => `https://ui-avatars.com/api/?name=${encodeURIComponent(name||'Guest')}&background=0D8ABC&color=fff&rounded=true`;
   const timeFmt = (ts) => new Date(ts||Date.now()).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
@@ -128,15 +308,27 @@ document.addEventListener('DOMContentLoaded', () => {
   function hideTyping(id) { const el = typingMap.get(id); if (el) { el.remove(); typingMap.delete(id); } }
 
   function renderStickers() {
+    // Kiểm tra nếu không có div palette thì thôi
     if (!stickerPalette) return;
+    
+    // Xóa nội dung cũ (tránh bị duplicate nếu gọi hàm nhiều lần)
     stickerPalette.innerHTML = '';
+    
     STICKERS.forEach(u => {
-      const img = document.createElement('img'); img.src = u; img.className = 'sticker'; img.title = 'Send sticker';
+      const img = document.createElement('img'); 
+      img.src = u; 
+      img.className = 'sticker'; 
+      img.title = 'Send sticker';
+      
       img.addEventListener('click', () => {
-        // local render then send to server (server relays to others)
+        // 1. Gửi sticker (Logic cũ giữ nguyên)
         renderChatMessage({ id: myId, userName, avatar: myAvatar, message: u, type: 'sticker', timestamp: Date.now() });
         socket.emit('chat-message', { roomId, userName, avatar: myAvatar, message: u, type: 'sticker' });
+
+        // 2. [MỚI] Đóng popup ngay sau khi chọn xong cho gọn
+        stickerPalette.classList.add('hidden'); 
       });
+      
       stickerPalette.appendChild(img);
     });
   }
@@ -355,17 +547,21 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleMicBtn.textContent = micOn ? "Mic Off" : "Mic On";
   });
 
-  function renderStickers() {
-    if (!stickerPalette) return;
-    stickerPalette.innerHTML = '';
-    STICKERS.forEach(u => {
-      const img = document.createElement('img'); img.src = u; img.className = 'sticker'; img.title = 'Send sticker';
-      img.addEventListener('click', () => {
-        // local render + emit
-        renderChatMessage({ id: myId, userName, avatar: myAvatar, message: u, type: 'sticker', timestamp: Date.now() });
-        socket.emit('chat-message', { roomId, userName, avatar: myAvatar, message: u, type: 'sticker' });
-      });
-      stickerPalette.appendChild(img);
+  // --- CHỨC NĂNG NÚT REFRESH ---
+  const refreshBtn = document.getElementById('refreshRoomsBtn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      // 1. Hiệu ứng xoay xoay (Add class 'spin' nếu muốn CSS animation phức tạp hơn)
+      refreshBtn.style.transform = "rotate(360deg)";
+      
+      // 2. Gọi lại hàm render danh sách
+      // Trong thực tế chỗ này sẽ là socket.emit('get-rooms')
+      renderRoomList(); 
+
+      // 3. Reset góc xoay sau khi animation xong (để lần sau bấm còn xoay tiếp)
+      setTimeout(() => {
+        refreshBtn.style.transform = "none";
+      }, 500);
     });
   }
 });
